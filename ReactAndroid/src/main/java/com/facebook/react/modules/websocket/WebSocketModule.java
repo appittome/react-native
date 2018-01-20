@@ -27,12 +27,17 @@ import com.facebook.react.modules.network.ForwardingCookieHandler;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import okhttp3.OkHttpClient;
+import okhttp3.Cookie;
+import okhttp3.CookieJar;
+import okhttp3.HttpUrl;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.WebSocket;
@@ -89,15 +94,67 @@ public final class WebSocketModule extends ReactContextBaseJavaModule {
       .connectTimeout(10, TimeUnit.SECONDS)
       .writeTimeout(10, TimeUnit.SECONDS)
       .readTimeout(0, TimeUnit.MINUTES) // Disable timeouts for read
+      .cookieJar(new CookieJar() {
+        @Override
+        public void saveFromResponse(HttpUrl hurl, List<Cookie> cookies) {
+          try {
+            Map headers = new HashMap<String, List<String>>();
+            List<String> cookieStrings = new ArrayList<String>();
+            // FLog.e(ReactConstants.TAG, "cookies from: " + hurl.uri().toString());
+            for(Cookie cookie: cookies) {
+              cookieStrings.add(cookie.toString());
+              //FLog.e(ReactConstants.TAG, "\t"+cookie.toString());
+            }
+
+            // Pretend headers
+            headers.put("Set-cookie", Collections.unmodifiableList(cookieStrings));
+            mCookieHandler.put(hurl.uri(), headers);
+          } catch (IOException e) {
+            FLog.e(
+              ReactConstants.TAG,
+              "Could not store cookies from request headers " + hurl.toString(),
+              e);
+          } 
+        }
+
+        @Override
+        public List<Cookie> loadForRequest(HttpUrl hurl) {
+          try {
+            URI origin = new URI(getDefaultOrigin(hurl.toString()));
+            //FLog.e(ReactConstants.TAG, "load url: " + hurl.uri().toString());
+            Map<String, List<String>> cookieMap = mCookieHandler.get(hurl.uri(), new HashMap());
+            // ForwaringCookieHandler.COOKIE_HEADER is not public so -
+            List<String> cookieList = cookieMap.get("Cookie");
+
+            if (cookieList == null || cookieList.isEmpty()) {
+              return Collections.emptyList();
+            }
+
+            for( String cookie: cookieList) {
+              //FLog.e(ReactConstants.TAG, "\t" + cookie);
+            }
+
+            return stringsToCookies(cookieList, hurl.uri());
+
+          } catch (URISyntaxException | IOException e) {
+            FLog.e(
+              ReactConstants.TAG,
+              "Unable to get cookie from " + url.toString(),
+              e);
+            return Collections.emptyList();
+          }
+        }
+      })
       .build();
 
     Request.Builder builder = new Request.Builder().tag(id).url(url);
-
+/*
     String cookie = getCookie(url);
     if (cookie != null) {
       builder.addHeader("Cookie", cookie);
     }
 
+*/
     if (options != null && options.hasKey("headers") && options.getType("headers").equals(ReadableType.Map)) {
 
       ReadableMap headers = options.getMap("headers");
@@ -316,6 +373,24 @@ public final class WebSocketModule extends ReactContextBaseJavaModule {
     } catch (URISyntaxException e) {
       throw new IllegalArgumentException("Unable to set " + uri + " as default origin header");
     }
+  }
+
+  private List<Cookie> stringsToCookies( List<String> cookieStrings, URI uri ) {
+    String domain = uri.getHost();
+    List<Cookie> cookiesList =  new ArrayList();
+    String[] cookies = cookieStrings.get(0).split(";");
+    for (int i = 0; i < cookies.length; i++) {
+      //FLog.e(ReactConstants.TAG, "save cookie: (" + domain + ") " + cookies[i] );
+      String[] cookie = cookies[i].split("=", 2);
+      if ( cookie.length > 1) {
+        cookiesList.add(new Cookie.Builder()
+          .name(cookie[0].trim())
+          .value(cookie[1])
+          .domain(domain)
+          .build());
+      }
+    }
+    return Collections.unmodifiableList(cookiesList);
   }
 
   /**

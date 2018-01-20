@@ -26,8 +26,8 @@ const {
   View,
 } = ReactNative;
 
-const DEFAULT_WS_URL = 'ws://localhost:5555/';
-const DEFAULT_HTTP_URL = 'http://localhost:5556/';
+const DEFAULT_WS_URL = 'ws://astor.ia:5555/';
+const DEFAULT_HTTP_URL = 'http://astor.ia:5556/';
 const WS_EVENTS = ['close', 'error', 'message', 'open'];
 const WS_STATES = [
   /* 0 */ 'CONNECTING',
@@ -230,7 +230,7 @@ class WebSocketExample extends React.Component<any, any, State> {
           value={showValue(this.state.lastMessage)}
         />
         <Row label="Last image received">
-          {canSend ? <WebSocketImage url={this.state.url} /> : null}
+          <View/>
         </Row>
         <TextInput
           style={styles.textInput}

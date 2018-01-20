@@ -32,10 +32,14 @@ ArrayBuffer instead of a string.
 
 const respondWithBinary = process.argv.indexOf('--binary') !== -1;
 const server = new WebSocket.Server({port: 5555});
+var count = 0;
+server.on('headers', (headers, req) => {
+  headers.push('Set-Cookie: wstest=WS-' + count++ + ';')
+  console.log('HEADERS::', headers)
+});
 server.on('connection', (ws) => {
   ws.on('message', (message) => {
     console.log('Received message:', message);
-    console.log('Cookie:', ws.upgradeReq.headers.cookie);
     if (respondWithBinary) {
       message = new Buffer(message);
     }
@@ -46,6 +50,8 @@ server.on('connection', (ws) => {
     ws.send(message);
   });
 
+  console.log('headers :', ws.upgradeReq.headers);
+  console.log('Cookie:', ws.upgradeReq.headers.cookie);
   console.log('Incoming connection!');
   ws.send('Why hello there!');
 });

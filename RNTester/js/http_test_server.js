@@ -23,18 +23,20 @@ This will set a cookie named "wstest" on the response of any incoming request.
 /* $FlowFixMe(>=0.54.0 site=react_native_oss) This comment suppresses an error
  * found when Flow v0.54 was deployed. To see the error delete this comment and
  * run Flow. */
-const connect = require('connect');
+const express = require('express');
 const http = require('http');
 
-const app = connect();
+const app = express();
+var count = 0;
 
 app.use(function(req, res) {
   console.log('received request');
   const cookieOptions = {
     //httpOnly: true, // the cookie is not accessible by the user (javascript,...)
     secure: false, // allow HTTP
+    expires: new Date(Date.now() + 5000),
   };
-  res.cookie('wstest', 'OK', cookieOptions);
+  res.cookie('wstest', 'OK-'+count++, cookieOptions);
   res.end('Cookie has been set!\n');
 });
 
