@@ -389,6 +389,15 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
 
 - (void)_HTTPHeadersDidFinish;
 {
+
+  NSDictionary<NSString *, NSString *> *allHeaderFields = (__bridge NSDictionary *)CFHTTPMessageCopyAllHeaderFields(_receivedHTTPHeaders);
+  NSArray<NSHTTPCookie *> *cookies = [NSHTTPCookie cookiesWithResponseHeaderFields:allHeaderFields forURL:_url];
+  NSHTTPCookieStorage *sharedCookies = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+
+  [cookies enumerateObjectsUsingBlock:^(NSHTTPCookie * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+    [sharedCookies setCookie:obj];
+  }];
+
   NSInteger responseCode = CFHTTPMessageGetResponseStatusCode(_receivedHTTPHeaders);
 
   if (responseCode >= 400) {
