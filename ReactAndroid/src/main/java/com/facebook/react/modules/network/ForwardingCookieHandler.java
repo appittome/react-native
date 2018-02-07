@@ -7,9 +7,12 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.CookieHandler;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -22,10 +25,16 @@ import android.webkit.CookieManager;
 import android.webkit.CookieSyncManager;
 import android.webkit.ValueCallback;
 
+import okhttp3.Cookie;
+import okhttp3.CookieJar;
+import okhttp3.HttpUrl;
+
+import com.facebook.common.logging.FLog;
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.GuardedAsyncTask;
 import com.facebook.react.bridge.GuardedResultAsyncTask;
 import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.common.ReactConstants;
 
 /**
  * Cookie handler that forwards all cookies to the WebView CookieManager.
@@ -90,6 +99,10 @@ public class ForwardingCookieHandler extends CookieHandler {
     } else {
       clearCookiesAsync(callback);
     }
+  }
+
+  public CookieJar asJar() {
+    return this.new ForwardingCookieJar();
   }
 
   private void clearCookiesAsync(final Callback callback) {
@@ -225,6 +238,52 @@ public class ForwardingCookieHandler extends CookieHandler {
     @TargetApi(21)
     private void flush() {
       getCookieManager().flush();
+    }
+  }
+
+  // the okhttp3 API provides a method to insert a CookieJar to handle all cookie
+  // headers on reqeusts and responses implicitly.  Using this jar, all the
+  // cookies will be routed through the ForwardingCookieHandler, and thereby back
+  // into the webview.
+  private class ForwardingCookieJar implements CookieJar {
+    @Override
+    public void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
+      List<String> cookieStrings = new ArrayList<String>(cookies.size());
+      for(Cookie cookie: cookies) {
+        cookieStrings.add(cookie.toString());
+      }
+      addCookies(
+        url.uri().toString(),
+        Collections.unmodifiableList(cookieStrings));
+    }
+
+    @Override
+    public List<Cookie> loadForRequest(HttpUrl url) {
+      try {
+        Map<String, List<String>> cookieMap = get(url.uri(), new HashMap());
+        List<String> cookieList = cookieMap.get(COOKIE_HEADER);
+
+        if (cookieList == null || cookieList.isEmpty()) {
+          return Collections.emptyList();
+        }
+
+        //cookieList is a singleton with first entry == request Cookie header
+        String[] allCookies = cookieList.get(0).split(";");
+        List<Cookie> cookies = new ArrayList<Cookie>(allCookies.length);
+
+        //parse cookie name=value; entries as Set-Cookie without other attributes
+        for (String aCookie : allCookies) {
+          cookies.add(Cookie.parse(url, aCookie));
+        }
+        return Collections.unmodifiableList(cookies);
+
+      } catch (IOException e) {
+        FLog.e(
+          ReactConstants.TAG,
+          "Unable to get cookie from " + url.toString(),
+          e);
+        return Collections.emptyList();
+      }
     }
   }
 }

@@ -88,14 +88,10 @@ public final class WebSocketModule extends ReactContextBaseJavaModule {
       .connectTimeout(10, TimeUnit.SECONDS)
       .writeTimeout(10, TimeUnit.SECONDS)
       .readTimeout(0, TimeUnit.MINUTES) // Disable timeouts for read
+      .cookieJar(mCookieHandler.asJar())
       .build();
 
     Request.Builder builder = new Request.Builder().tag(id).url(url);
-
-    String cookie = getCookie(url);
-    if (cookie != null) {
-      builder.addHeader("Cookie", cookie);
-    }
 
     if (options != null && options.hasKey("headers") && options.getType("headers").equals(ReadableType.Map)) {
 
@@ -358,28 +354,6 @@ public final class WebSocketModule extends ReactContextBaseJavaModule {
       return defaultOrigin;
     } catch (URISyntaxException e) {
       throw new IllegalArgumentException("Unable to set " + uri + " as default origin header");
-    }
-  }
-
-  /**
-   * Get the cookie for a specific domain
-   *
-   * @param uri
-   * @return The cookie header or null if none is set
-   */
-  private String getCookie(String uri) {
-    try {
-      URI origin = new URI(getDefaultOrigin(uri));
-      Map<String, List<String>> cookieMap = mCookieHandler.get(origin, new HashMap());
-      List<String> cookieList = cookieMap.get("Cookie");
-
-      if (cookieList == null || cookieList.isEmpty()) {
-        return null;
-      }
-
-      return cookieList.get(0);
-    } catch (URISyntaxException | IOException e) {
-      throw new IllegalArgumentException("Unable to get cookie from " + uri);
     }
   }
 }
